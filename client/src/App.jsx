@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { supabase } from './lib/supabase';  // ← זה החיבור לסופבייס
 
 function App() {
   const [apiMessage, setApiMessage] = useState('');
@@ -12,35 +11,29 @@ function App() {
       .catch(err => console.error(err));
   }, []);
 
-  // בדיקה שסופבייס עובד
+  // בדיקה שסופבייס עובד דרך השרת
   useEffect(() => {
-    console.log('🔍 Supabase useEffect triggered - starting test query...');
-    
-    if (!supabase) {
-      console.error('❌ Supabase client is not initialized. Check your .env file.');
-      return;
-    }
+    console.log('🔍 Supabase useEffect triggered - calling server API...');
     
     async function testSupabase() {
       try {
-        console.log('📡 Attempting Supabase query...');
-        const { data, error } = await supabase.from('test').select('*');
-
-        if (error) {
-          console.error('❌ Supabase error:', error);
-          console.error('Error details:', {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint
-          });
-        } else {
-          console.log('✅ Supabase query successful!');
-          console.log('📡 Supabase response:', data);
-          console.log('📊 Number of records:', data?.length || 0);
-        }
+        console.log('📡 Attempting to fetch data from server API...');
+        const response = await axios.get('http://localhost:4000/api/test');
+        
+        console.log('✅ Server API call successful!');
+        console.log('📡 Supabase data from server:', response.data);
+        console.log('📊 Response data:', response.data.data);
+        console.log('📊 Number of records:', response.data.data?.length || 0);
       } catch (err) {
-        console.error('💥 Unexpected error in Supabase query:', err);
+        console.error('❌ Error calling server API:', err);
+        if (err.response) {
+          console.error('Error response:', err.response.data);
+          console.error('Error status:', err.response.status);
+        } else if (err.request) {
+          console.error('No response received. Is the server running?');
+        } else {
+          console.error('Error details:', err.message);
+        }
       }
     }
 
