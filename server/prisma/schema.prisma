@@ -1,5 +1,7 @@
+// server/schema.prisma
+
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql" // ⬅️ שינוי קריטי!
 }
 
 generator client {
