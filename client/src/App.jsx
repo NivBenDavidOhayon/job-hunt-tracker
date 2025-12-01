@@ -1,50 +1,74 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/Login/LoginPage.jsx';
+import RegisterPage from './pages/Register/RegisterPage.jsx';
+import Dashboard from './pages/Dashboard/Dashboard.jsx';
 
 function App() {
-  const [apiMessage, setApiMessage] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // בדיקה שהשרת רץ
+  // Check for existing token on mount
   useEffect(() => {
-    axios.get('http://localhost:4000/')
-      .then(res => setApiMessage(res.data.message))
-      .catch(err => console.error(err));
+    const token = localStorage.getItem('token');
+    setIsAuthenticated(!!token);
+    setIsLoading(false);
   }, []);
 
-  // בדיקה שסופבייס עובד דרך השרת
-  useEffect(() => {
-    console.log('🔍 Supabase useEffect triggered - calling server API...');
-    
-    async function testSupabase() {
-      try {
-        console.log('📡 Attempting to fetch data from server API...');
-        const response = await axios.get('http://localhost:4000/api/test');
-        
-        console.log('✅ Server API call successful!');
-        console.log('📡 Supabase data from server:', response.data);
-        console.log('📊 Response data:', response.data.data);
-        console.log('📊 Number of records:', response.data.data?.length || 0);
-      } catch (err) {
-        console.error('❌ Error calling server API:', err);
-        if (err.response) {
-          console.error('Error response:', err.response.data);
-          console.error('Error status:', err.response.status);
-        } else if (err.request) {
-          console.error('No response received. Is the server running?');
-        } else {
-          console.error('Error details:', err.message);
-        }
-      }
-    }
+  // Handle successful authentication
+  const handleAuthSuccess = (token) => {
+    setIsAuthenticated(true);
+  };
 
-    testSupabase();
-  }, []);
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>Job Hunt Tracker</h1>
-      <p>Backend says: {apiMessage || 'Loading...'}</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route 
+          path="/login" 
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <LoginPage onAuthSuccess={handleAuthSuccess} />
+            )
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <RegisterPage onAuthSuccess={handleAuthSuccess} />
+            )
+          } 
+        />
+        <Route 
+          path="/dashboard" 
+          element={
+            isAuthenticated ? (
+              <Dashboard />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/" 
+          element={
+            <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
+          } 
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
