@@ -2,12 +2,24 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const authRoutes = require('./routes/authRoutes');
+const authMiddleware = require('./middleware/auth');
+const jobsRoutes = require('./routes/jobsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+app.use('/auth', authRoutes);
+app.use('/jobs', jobsRoutes);
+
+app.get('/me', authMiddleware, (req, res) => {
+  res.json({
+    message: 'You are authenticated',
+    user: req.user,
+  });
+});
 
 // יצירת Supabase client בצד השרת
 // מנסה לקרוא מ-.env, אם לא קיים - משתמש ב-config.js

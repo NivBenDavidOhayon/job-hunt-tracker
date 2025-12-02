@@ -1,7 +1,8 @@
-// server/schema.prisma
+// server/prisma/schema.prisma
 
 datasource db {
-  provider = "postgresql" // ⬅️ שינוי קריטי!
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -9,8 +10,8 @@ generator client {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+  email     String   @id           
+  username  String                
   password  String
   createdAt DateTime @default(now())
   jobs      Job[]
@@ -18,12 +19,12 @@ model User {
 
 model Job {
   id            Int      @id @default(autoincrement())
-  userId        Int
+  userEmail     String                 // ⬅️ FK לפי email
   companyName   String
   positionTitle String
   link          String?
   status        String   @default("Applied")
   createdAt     DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userEmail], references: [email])
 }
