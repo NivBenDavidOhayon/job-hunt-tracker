@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../api';
 
-function Dashboard() {
+function Dashboard({ onLogout }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -63,7 +63,15 @@ function Dashboard() {
 
   return (
     <div style={styles.container}>
-      <h1>Dashboard</h1>
+      <div style={styles.header}>
+        <h1>Dashboard</h1>
+        {onLogout && (
+          <button style={styles.logoutButton} onClick={onLogout}>
+            Logout
+          </button>
+        )}
+      </div>
+
       <p>Welcome to your Job Hunt Tracker Dashboard!</p>
 
       {error && <div style={styles.error}>{error}</div>}
@@ -160,6 +168,20 @@ const styles = {
     maxWidth: '800px',
     margin: '0 auto',
   },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+  },
+  logoutButton: {
+    padding: '0.5rem 1rem',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    backgroundColor: '#f5f5f5',
+    cursor: 'pointer',
+    fontWeight: '500',
+  },
   form: {
     marginTop: '1.5rem',
     marginBottom: '2rem',
@@ -222,4 +244,3 @@ const styles = {
 };
 
 export default Dashboard;
-
