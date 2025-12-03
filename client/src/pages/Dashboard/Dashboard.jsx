@@ -1,6 +1,27 @@
 import { useEffect, useState } from 'react';
 import api from '../../api';
 
+const getStatusStyle = (status) => {
+  const base = {
+    display: 'inline-block',
+    padding: '0.15rem 0.6rem',
+    borderRadius: '999px',
+    fontSize: '0.8rem',
+    fontWeight: 500,
+  };
+
+  switch (status) {
+    case 'Interview':
+      return { ...base, backgroundColor: '#e3f2fd', color: '#1565c0' };
+    case 'Offer':
+      return { ...base, backgroundColor: '#e8f5e9', color: '#2e7d32' };
+    case 'Rejected':
+      return { ...base, backgroundColor: '#ffebee', color: '#c62828' };
+    default:
+      return { ...base, backgroundColor: '#ede7f6', color: '#4527a0' };
+  }
+};
+
 function Dashboard({ onLogout }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,6 +32,8 @@ function Dashboard({ onLogout }) {
     link: '',
     status: 'Applied',
   });
+  const [editingJobId, setEditingJobId] = useState(null);
+  const [editingStatus, setEditingStatus] = useState('Applied');
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -57,6 +80,48 @@ function Dashboard({ onLogout }) {
         err.response?.data?.error ||
         err.message ||
         'Failed to create job.';
+      setError(message);
+    }
+  };
+
+  const handleDelete = async (jobId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this job?');
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      await api.delete(`/jobs/${jobId}`);
+      setJobs((prev) => prev.filter((job) => job.id !== jobId));
+      if (editingJobId === jobId) {
+        setEditingJobId(null);
+      }
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to delete job.';
+      setError(message);
+    }
+  };
+
+  const handleUpdate = async (jobId) => {
+    try {
+      setError('');
+      const response = await api.patch(`/jobs/${jobId}`, {
+        status: editingStatus,
+      });
+
+      setJobs((prev) =>
+        prev.map((job) => (job.id === jobId ? response.data : job))
+      );
+      setEditingJobId(null);
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to update job.';
       setError(message);
     }
   };
@@ -133,29 +198,95 @@ function Dashboard({ onLogout }) {
       ) : jobs.length === 0 ? (
         <p>No jobs yet. Add your first one!</p>
       ) : (
-        <ul style={styles.jobsList}>
-          {jobs.map((job) => (
-            <li key={job.id} style={styles.jobItem}>
-              <div style={styles.jobHeader}>
-                <strong>{job.positionTitle}</strong> @ {job.companyName}
-              </div>
-              {job.link && (
-                <div>
-                  <a href={job.link} target="_blank" rel="noreferrer">
-                    View posting
-                  </a>
-                </div>
-              )}
-              <div>Status: {job.status}</div>
-              <div>
-                Created:{' '}
-                {job.createdAt
-                  ? new Date(job.createdAt).toLocaleString()
-                  : 'Unknown'}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.tableHeaderCell}>Company</th>
+              <th style={styles.tableHeaderCell}>Position</th>
+              <th style={styles.tableHeaderCell}>Status</th>
+              <th style={styles.tableHeaderCell}>Link</th>
+              <th style={styles.tableHeaderCell}>Created</th>
+              <th style={styles.tableHeaderCell}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job) => {
+              const formattedDate = job.createdAt
+                ? new Date(job.createdAt).toLocaleString()
+                : 'Unknown';
+
+              return (
+                <tr key={job.id}>
+                  <td style={styles.tableCell}>{job.companyName}</td>
+                  <td style={styles.tableCell}>{job.positionTitle}</td>
+                  <td style={styles.tableCell}>
+                    {editingJobId === job.id ? (
+                      <select
+                        value={editingStatus}
+                        onChange={(e) => setEditingStatus(e.target.value)}
+                      >
+                        <option value="Applied">Applied</option>
+                        <option value="Interview">Interview</option>
+                        <option value="Offer">Offer</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    ) : (
+                      <span style={getStatusStyle(job.status)}>
+                        {job.status}
+                      </span>
+                    )}
+                  </td>
+                  <td style={styles.tableCell}>
+                    {job.link ? (
+                      <a href={job.link} target="_blank" rel="noreferrer">
+                        View posting
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={styles.tableCell}>{formattedDate}</td>
+                  <td style={styles.actionsCell}>
+                    {editingJobId === job.id ? (
+                      <>
+                        <button
+                          onClick={() => handleUpdate(job.id)}
+                          style={styles.actionButton}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingJobId(null)}
+                          style={styles.actionButton}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingJobId(job.id);
+                            setEditingStatus(job.status || 'Applied');
+                          }}
+                          style={styles.actionButton}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(job.id)}
+                          style={styles.actionButton}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   );
@@ -226,20 +357,40 @@ const styles = {
   jobsTitle: {
     marginBottom: '0.75rem',
   },
-  jobsList: {
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginTop: '0.5rem',
   },
-  jobItem: {
-    padding: '1rem',
-    border: '1px solid #eee',
-    borderRadius: '6px',
-    marginBottom: '0.75rem',
-    backgroundColor: '#fafafa',
+  tableHeaderCell: {
+    textAlign: 'left',
+    padding: '0.5rem',
+    borderBottom: '1px solid #ddd',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    backgroundColor: '#f7f7f7',
   },
-  jobHeader: {
-    marginBottom: '0.25rem',
+  tableCell: {
+    padding: '0.5rem',
+    borderBottom: '1px solid #eee',
+    fontSize: '0.9rem',
+    verticalAlign: 'top',
+  },
+  actionsCell: {
+    padding: '0.5rem',
+    borderBottom: '1px solid #eee',
+    fontSize: '0.9rem',
+    verticalAlign: 'top',
+    whiteSpace: 'nowrap',
+  },
+  actionButton: {
+    marginRight: '0.4rem',
+    padding: '0.25rem 0.6rem',
+    fontSize: '0.8rem',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    backgroundColor: '#f5f5f5',
+    cursor: 'pointer',
   },
 };
 
