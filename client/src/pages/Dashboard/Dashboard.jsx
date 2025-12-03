@@ -34,6 +34,7 @@ function Dashboard({ onLogout }) {
   });
   const [editingJobId, setEditingJobId] = useState(null);
   const [editingStatus, setEditingStatus] = useState('Applied');
+  const [cvFile, setCvFile] = useState(null);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -64,16 +65,27 @@ function Dashboard({ onLogout }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!cvFile) {
+      setError('Please upload a CV file for this job.');
+      return;
+    }
+
     try {
       setError('');
       const response = await api.post('/jobs', form);
-      setJobs((prev) => [response.data, ...prev]);
+      const createdJob = response.data;
+
+      const updatedJob = await handleUploadCv(createdJob.id, cvFile);
+
+      setJobs((prev) => [updatedJob || createdJob, ...prev]);
+
       setForm({
         companyName: '',
         positionTitle: '',
         link: '',
         status: 'Applied',
       });
+      setCvFile(null);
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -126,6 +138,36 @@ function Dashboard({ onLogout }) {
     }
   };
 
+  const handleUploadCv = async (jobId, file) => {
+    if (!file) return null;
+
+    try {
+      setError('');
+      const formData = new FormData();
+      formData.append('cv', file);
+
+      const response = await api.post(`/jobs/${jobId}/cv`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const updatedJob = response.data;
+      setJobs((prev) =>
+        prev.map((job) => (job.id === jobId ? updatedJob : job))
+      );
+      return updatedJob;
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to upload CV.';
+      setError(message);
+      return null;
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -174,6 +216,17 @@ function Dashboard({ onLogout }) {
           />
         </div>
         <div style={styles.formGroup}>
+          <label style={styles.label}>CV File</label>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setCvFile(file);
+            }}
+          />
+        </div>
+        <div style={styles.formGroup}>
           <label style={styles.label}>Status</label>
           <select
             name="status"
@@ -204,6 +257,7 @@ function Dashboard({ onLogout }) {
               <th style={styles.tableHeaderCell}>Company</th>
               <th style={styles.tableHeaderCell}>Position</th>
               <th style={styles.tableHeaderCell}>Status</th>
+              <th style={styles.tableHeaderCell}>CV</th>
               <th style={styles.tableHeaderCell}>Link</th>
               <th style={styles.tableHeaderCell}>Created</th>
               <th style={styles.tableHeaderCell}>Actions</th>
@@ -217,8 +271,13 @@ function Dashboard({ onLogout }) {
 
               return (
                 <tr key={job.id}>
+                  {/* Company */}
                   <td style={styles.tableCell}>{job.companyName}</td>
+
+                  {/* Position */}
                   <td style={styles.tableCell}>{job.positionTitle}</td>
+
+                  {/* Status */}
                   <td style={styles.tableCell}>
                     {editingJobId === job.id ? (
                       <select
@@ -236,6 +295,43 @@ function Dashboard({ onLogout }) {
                       </span>
                     )}
                   </td>
+
+                  {/* CV */}
+                  <td style={styles.tableCell}>
+                    {editingJobId === job.id ? (
+                      <>
+                        {job.cvUrl && (
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            <a
+                              href={job.cvUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              View current CV
+                            </a>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleUploadCv(job.id, file);
+                            }
+                          }}
+                        />
+                      </>
+                    ) : job.cvUrl ? (
+                      <a href={job.cvUrl} target="_blank" rel="noreferrer">
+                        View CV
+                      </a>
+                    ) : (
+                      <span style={{ opacity: 0.6 }}>No CV</span>
+                    )}
+                  </td>
+
+                  {/* Link */}
                   <td style={styles.tableCell}>
                     {job.link ? (
                       <a href={job.link} target="_blank" rel="noreferrer">
@@ -245,7 +341,11 @@ function Dashboard({ onLogout }) {
                       '—'
                     )}
                   </td>
+
+                  {/* Created */}
                   <td style={styles.tableCell}>{formattedDate}</td>
+
+                  {/* Actions */}
                   <td style={styles.actionsCell}>
                     {editingJobId === job.id ? (
                       <>

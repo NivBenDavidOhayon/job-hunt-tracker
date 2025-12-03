@@ -9,8 +9,8 @@ generator client {
 }
 
 model User {
-  email     String   @id           
-  username  String                
+  email     String   @id
+  username  String
   password  String
   createdAt DateTime @default(now())
   jobs      Job[]
@@ -18,11 +18,12 @@ model User {
 
 model Job {
   id            Int      @id @default(autoincrement())
-  userEmail     String                 // ⬅️ FK לפי email
+  userEmail     String
   companyName   String
   positionTitle String
   link          String?
   status        String   @default("Applied")
+  cvUrl         String?   // שדה יחיד לקו״ח
   createdAt     DateTime @default(now())
 
   user User @relation(fields: [userEmail], references: [email])
