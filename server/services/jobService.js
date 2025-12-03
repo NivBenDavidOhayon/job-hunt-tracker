@@ -9,10 +9,15 @@ async function getJobs(userEmail) {
 }
 
 async function createJob(userEmail, jobData) {
+  const { companyName, positionTitle, link, status } = jobData;
+
   return prisma.job.create({
     data: {
-      ...jobData,
       userEmail,
+      companyName,
+      positionTitle,
+      link: link || null,
+      status: status || 'Applied',
     },
   });
 }

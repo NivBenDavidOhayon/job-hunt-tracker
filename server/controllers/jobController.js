@@ -1,28 +1,28 @@
 // server/controllers/jobController.js
-const jobService = require('../services/jobService');
+const { getJobs, createJob } = require('../services/jobService');
 
-async function getJobs(req, res) {
+async function getJobsController(req, res) {
   try {
-    const jobs = await jobService.getJobs(req.user.email);
+    const jobs = await getJobs(req.user.email);
     res.json(jobs);
-  } catch (err) {
-    console.error('Get jobs error:', err);
-    res.status(500).json({ message: 'Failed to fetch jobs' });
+  } catch (error) {
+    console.error('Get jobs error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
-async function createJob(req, res) {
+async function createJobController(req, res) {
   try {
-    const job = await jobService.createJob(req.user.email, req.body);
+    const job = await createJob(req.user.email, req.body);
     res.status(201).json(job);
-  } catch (err) {
-    console.error('Create job error:', err);
-    res.status(500).json({ message: 'Failed to create job' });
+  } catch (error) {
+    console.error('Create job error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
 module.exports = {
-  getJobs,
-  createJob,
+  getJobs: getJobsController,
+  createJob: createJobController,
 };
 
