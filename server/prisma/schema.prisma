@@ -17,14 +17,28 @@ model User {
 }
 
 model Job {
-  id            Int      @id @default(autoincrement())
-  userEmail     String
-  companyName   String
-  positionTitle String
-  link          String?
-  status        String   @default("Applied")
-  cvUrl         String?   // שדה יחיד לקו״ח
-  createdAt     DateTime @default(now())
-
+  id              Int      @id @default(autoincrement())
+  userEmail       String
+  companyName     String
+  positionTitle   String
+  link            String?
+  status          String   @default("Applied")
+  cvUrl           String?
+  createdAt       DateTime @default(now())
+  
+  // ===================================
+  // 🤖 שדות AI מעודכנים
+  // ===================================
+  description     String? // טקסט המשרה המלא שנסרק
+  
+  // סיכומים
+  aiSummaryRole   String? // סיכום קצר על התפקיד (AI)
+  aiSummaryTech   String? // סיכום קצר על הטכנולוגיות (AI)
+  
+  // ניתוח פרטני
+  aiLevel         String? // רמת ניסיון נדרשת (Junior, Senior)
+  aiJobType       String? // סוג משרה (Backend, Full-stack, Data, Full-time)
+  aiTags          Json?   // מערך של טכנולוגיות ומיומנויות [Python, FastAPI, MongoDB]
+  
   user User @relation(fields: [userEmail], references: [email])
 }

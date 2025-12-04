@@ -19,6 +19,7 @@ async function getJobsController(req, res) {
 
 async function createJobController(req, res) {
   try {
+    // קריאה לשירות, שמטפל ב-Scraping וב-AI באופן פנימי
     const job = await createJobService(req.user.email, req.body);
     res.status(201).json(job);
   } catch (error) {

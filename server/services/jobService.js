@@ -1,5 +1,7 @@
 // server/services/jobService.js
 const prisma = require('../prismaClient');
+const { scrapeJobDescription } = require('./scraperService');
+const { analyzeJobDescription } = require('./aiService');
 
 async function getJobs(userEmail) {
   return prisma.job.findMany({
@@ -11,6 +13,31 @@ async function getJobs(userEmail) {
 async function createJob(userEmail, jobData) {
   const { companyName, positionTitle, link, status } = jobData;
 
+  // --- שלב 1: Scraping ---
+  let description = null;
+  if (link) {
+    description = await scrapeJobDescription(link);
+  }
+
+  // --- שלב 2: AI Analysis ---
+  let aiData = {};
+  if (description) {
+    const analysisResult = await analyzeJobDescription(description);
+  
+    if (analysisResult) {
+      // 👇 נשנה את שמות השדות כדי להתאים למודל Prisma החדש
+      aiData.description = analysisResult.description; 
+      aiData.aiLevel = analysisResult.aiLevel;
+      aiData.aiTags = analysisResult.aiTags; 
+      aiData.aiSummaryRole = analysisResult.aiSummaryRole; // 👈 חדש
+      aiData.aiSummaryTech = analysisResult.aiSummaryTech; // 👈 חדש
+      aiData.aiJobType = analysisResult.aiJobType;     // 👈 חדש
+    } else {
+      aiData.description = description;
+    }
+  }
+
+  // --- שלב 3: שמירה ב-DB ---
   return prisma.job.create({
     data: {
       userEmail,
@@ -18,6 +45,8 @@ async function createJob(userEmail, jobData) {
       positionTitle,
       link: link || null,
       status: status || 'Applied',
+      // שילוב נתוני ה-AI/Scraping
+      ...aiData, 
     },
   });
 }
