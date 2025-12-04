@@ -140,33 +140,43 @@ function Dashboard({ onLogout }) {
 
   const handleUploadCv = async (jobId, file) => {
     if (!file) return null;
-
+  
     try {
       setError('');
       const formData = new FormData();
       formData.append('cv', file);
-
-      const response = await api.post(`/jobs/${jobId}/cv`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
+  
+      // נוודא שיש טוקן שנשלח ב-Authorization
+      const token = localStorage.getItem('token'); // או השם שבו את שומרת את ה-JWT
+  
+      const headers = {};
+  
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+  
+      // לא מגדירים Content-Type ידנית – axios יעשה את זה לבד עבור FormData
+      const response = await api.post(`/jobs/${jobId}/cv`, formData, { headers });
+  
       const updatedJob = response.data;
+  
       setJobs((prev) =>
         prev.map((job) => (job.id === jobId ? updatedJob : job))
       );
+  
       return updatedJob;
     } catch (err) {
+      const apiMessage = err.response?.data?.message;
+      const apiDetails = err.response?.data?.details || err.response?.data?.error;
       const message =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
+        (apiDetails ? `${apiMessage || 'Error'}: ${apiDetails}` : apiMessage) ||
         err.message ||
         'Failed to upload CV.';
       setError(message);
       return null;
     }
   };
+  
 
   return (
     <div style={styles.container}>

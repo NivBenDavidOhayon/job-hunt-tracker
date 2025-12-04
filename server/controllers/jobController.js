@@ -136,7 +136,12 @@ async function uploadJobCvController(req, res) {
     res.json(updatedJob);
   } catch (error) {
     console.error('Upload job CV error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+
+    return res.status(500).json({
+      message: 'Server error',
+      details: error.message || null,
+      meta: error.meta || null,
+    });
   }
 }
 
