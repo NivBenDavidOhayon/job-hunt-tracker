@@ -8,6 +8,8 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+
+ 
   // Check for existing token on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -15,6 +17,12 @@ function App() {
     setIsLoading(false);
   }, []);
 
+  const handleLogout = () => {
+    // מוחק את הטוקן מהדפדפן
+    localStorage.removeItem('token');
+    // מעדכן את ה־state באפליקציה
+    setIsAuthenticated(false);
+  };
   // Handle successful authentication
   const handleAuthSuccess = (token) => {
     setIsAuthenticated(true);
@@ -51,16 +59,17 @@ function App() {
             )
           } 
         />
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
             isAuthenticated ? (
-              <Dashboard />
+              <Dashboard onLogout={handleLogout} />
             ) : (
               <Navigate to="/login" replace />
             )
-          } 
+          }
         />
+
         <Route 
           path="/" 
           element={
@@ -70,6 +79,8 @@ function App() {
       </Routes>
     </BrowserRouter>
   );
+
+  
 }
 
 export default App;

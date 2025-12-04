@@ -6,18 +6,20 @@ const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 
-// ה-connection string של Supabase שלך
+// חשוב: חיבור ל־Supabase Postgres מה־.env
 const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL is not set in .env');
+}
 
-// יוצרים pool ל-Postgres
 const pool = new Pool({
   connectionString,
 });
 
-// יוצרים adapter לפי Prisma 7
+// adapter לפי Prisma 7 (engine type "client")
 const adapter = new PrismaPg(pool);
 
-// זה הלקוח הסופי שמשתמש בכל הפרויקט
+// 👈 זה ה־Client היחיד שצריך בכל הפרויקט
 const prisma = new PrismaClient({
   adapter,
 });
