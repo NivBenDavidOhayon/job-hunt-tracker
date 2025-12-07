@@ -18,7 +18,8 @@ async function analyzeJobDescription(jobDescription) {
   // ההנחיה (Prompt) המשופרת
   const prompt = `
     Analyze the job description text provided below.
-    Extract all key information and summarize the role using a maximum of 3 sentences.
+    Extract the official and most relevant Job Title and all key information.
+    Summarize the role using a maximum of 3 sentences.
     Return the result in a strict JSON format matching the schema exactly.
 
     Text to analyze:
@@ -27,18 +28,19 @@ async function analyzeJobDescription(jobDescription) {
     ---
 
     Required JSON Output Schema:
-    1. aiSummaryRole: A short summary (max 3 sentences) of the core responsibilities and team focus.
-    2. aiSummaryTech: A short summary (max 2 sentences) of the main required technologies and stack.
-    3. aiLevel: The required experience level. Choose one from: "Junior", "Mid", "Senior", "Lead", "Manager". If not clear, default to "Mid".
-    4. aiJobType: The primary function type. Choose one from: "Backend", "Full-stack", "Data", "DevOps", "Mobile", "QA".
-    5. aiTags: An array of up to 10 key technologies, programming languages, and frameworks mentioned as MUST or REQUIRED skills. Example: ["Python", "FastAPI", "MongoDB", "SQL", "TypeScript"].
+    1. positionTitle: The official title of the job (e.g., "Junior Software Engineer").
+    2. aiSummaryRole: A short summary (max 3 sentences) of the core responsibilities and team focus.
+    3. aiSummaryTech: A short summary (max 2 sentences) of the main required technologies and stack.
+    4. aiLevel: The required experience level. Choose one from: "Junior", "Mid", "Senior", "Lead", "Manager". If not clear, default to "Mid".
+    5. aiJobType: The primary function type. Choose one from: "Backend", "Full-stack", "Data", "DevOps", "Mobile", "QA".
+    6. aiTags: An array of up to 10 key technologies, programming languages, and frameworks mentioned as MUST or REQUIRED skills. Example: ["Python", "FastAPI", "MongoDB", "SQL", "TypeScript"].
 
     The output MUST be only the raw JSON object, without any surrounding text or markdown.
   `;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // מומלץ gpt-4o עבור דיוק טוב יותר בחילוץ JSON
+      model: "gpt-4o", // מודל מומלץ לדיוק בחילוץ JSON
       messages: [
         { 
           role: "system", 
@@ -46,7 +48,7 @@ async function analyzeJobDescription(jobDescription) {
         },
         { role: "user", content: prompt }
       ],
-      temperature: 0.2, // טמפרטורה נמוכה לעקביות בחילוץ נתונים
+      temperature: 0.2, 
       response_format: { type: "json_object" } 
     });
 
@@ -55,10 +57,10 @@ async function analyzeJobDescription(jobDescription) {
 
     const result = JSON.parse(cleanJson);
     
-    // נוסיף את טקסט המקור המלא לשמירה, כפי שעשינו קודם.
+    // מוודאים שטקסט המקור המלא נשמר
     result.description = jobDescription;
 
-    console.log('✅ AI Analysis successful. Extracted:', Object.keys(result));
+    console.log('✅ AI Analysis successful. Extracted keys:', Object.keys(result));
     return result;
 
   } catch (error) {
