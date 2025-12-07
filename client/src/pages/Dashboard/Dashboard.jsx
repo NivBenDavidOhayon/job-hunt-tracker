@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../api';
+import AppLogo from '../../components/AppLogo';
 
 const getStatusStyle = (status) => {
   const base = {
@@ -32,9 +33,10 @@ function Dashboard({ onLogout }) {
     link: '',
     status: 'Applied',
   });
-  const [editingJobId, setEditingJobId] = useState(null);
-  const [editingStatus, setEditingStatus] = useState('Applied');
   const [cvFile, setCvFile] = useState(null);
+
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [modalStatus, setModalStatus] = useState('Applied');
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -57,6 +59,12 @@ function Dashboard({ onLogout }) {
 
     fetchJobs();
   }, []);
+
+  useEffect(() => {
+    if (selectedJob) {
+      setModalStatus(selectedJob.status || 'Applied');
+    }
+  }, [selectedJob]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -104,9 +112,6 @@ function Dashboard({ onLogout }) {
       setError('');
       await api.delete(`/jobs/${jobId}`);
       setJobs((prev) => prev.filter((job) => job.id !== jobId));
-      if (editingJobId === jobId) {
-        setEditingJobId(null);
-      }
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -117,17 +122,20 @@ function Dashboard({ onLogout }) {
     }
   };
 
-  const handleUpdate = async (jobId) => {
+  const handleSaveStatus = async () => {
+    if (!selectedJob) return;
     try {
       setError('');
-      const response = await api.patch(`/jobs/${jobId}`, {
-        status: editingStatus,
+      const response = await api.patch(`/jobs/${selectedJob.id}`, {
+        status: modalStatus,
       });
 
+      const updated = response.data;
+
       setJobs((prev) =>
-        prev.map((job) => (job.id === jobId ? response.data : job))
+        prev.map((job) => (job.id === updated.id ? updated : job))
       );
-      setEditingJobId(null);
+      setSelectedJob(updated);
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -140,30 +148,31 @@ function Dashboard({ onLogout }) {
 
   const handleUploadCv = async (jobId, file) => {
     if (!file) return null;
-  
+
     try {
       setError('');
       const formData = new FormData();
       formData.append('cv', file);
-  
-      // נוודא שיש טוקן שנשלח ב-Authorization
-      const token = localStorage.getItem('token'); // או השם שבו את שומרת את ה-JWT
-  
+
+      const token = localStorage.getItem('token');
       const headers = {};
-  
+
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-  
-      // לא מגדירים Content-Type ידנית – axios יעשה את זה לבד עבור FormData
+
       const response = await api.post(`/jobs/${jobId}/cv`, formData, { headers });
-  
+
       const updatedJob = response.data;
-  
+
       setJobs((prev) =>
         prev.map((job) => (job.id === jobId ? updatedJob : job))
       );
-  
+
+      if (selectedJob && selectedJob.id === jobId) {
+        setSelectedJob(updatedJob);
+      }
+
       return updatedJob;
     } catch (err) {
       const apiMessage = err.response?.data?.message;
@@ -176,12 +185,33 @@ function Dashboard({ onLogout }) {
       return null;
     }
   };
-  
+
+  const formatDate = (value) => {
+    if (!value) return 'Unknown';
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
+  const renderAiField = (label, value) => (
+    <div style={{ marginBottom: '0.35rem' }}>
+      <span style={{ fontWeight: 600 }}>{label}: </span>
+      <span>{value || '—'}</span>
+    </div>
+  );
+
+  const renderAiTags = (value) => {
+    if (!value) return '—';
+    if (Array.isArray(value)) return value.join(', ');
+    return String(value);
+  };
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1>Dashboard</h1>
+        <AppLogo />
         {onLogout && (
           <button style={styles.logoutButton} onClick={onLogout}>
             Logout
@@ -261,142 +291,155 @@ function Dashboard({ onLogout }) {
       ) : jobs.length === 0 ? (
         <p>No jobs yet. Add your first one!</p>
       ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.tableHeaderCell}>Company</th>
-              <th style={styles.tableHeaderCell}>Position</th>
-              <th style={styles.tableHeaderCell}>Status</th>
-              <th style={styles.tableHeaderCell}>CV</th>
-              <th style={styles.tableHeaderCell}>Link</th>
-              <th style={styles.tableHeaderCell}>Created</th>
-              <th style={styles.tableHeaderCell}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => {
-              const formattedDate = job.createdAt
-                ? new Date(job.createdAt).toLocaleString()
-                : 'Unknown';
-
-              return (
-                <tr key={job.id}>
-                  {/* Company */}
+        <>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.tableHeaderCell}>Company</th>
+                <th style={styles.tableHeaderCell}>Position</th>
+                <th style={styles.tableHeaderCell}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map((job) => (
+                <tr
+                  key={job.id}
+                  style={styles.tableRow}
+                  onClick={() => setSelectedJob(job)}
+                >
                   <td style={styles.tableCell}>{job.companyName}</td>
-
-                  {/* Position */}
                   <td style={styles.tableCell}>{job.positionTitle}</td>
-
-                  {/* Status */}
                   <td style={styles.tableCell}>
-                    {editingJobId === job.id ? (
-                      <select
-                        value={editingStatus}
-                        onChange={(e) => setEditingStatus(e.target.value)}
-                      >
-                        <option value="Applied">Applied</option>
-                        <option value="Interview">Interview</option>
-                        <option value="Offer">Offer</option>
-                        <option value="Rejected">Rejected</option>
-                      </select>
-                    ) : (
-                      <span style={getStatusStyle(job.status)}>
-                        {job.status}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* CV */}
-                  <td style={styles.tableCell}>
-                    {editingJobId === job.id ? (
-                      <>
-                        {job.cvUrl && (
-                          <div style={{ marginBottom: '0.25rem' }}>
-                            <a
-                              href={job.cvUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              View current CV
-                            </a>
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleUploadCv(job.id, file);
-                            }
-                          }}
-                        />
-                      </>
-                    ) : job.cvUrl ? (
-                      <a href={job.cvUrl} target="_blank" rel="noreferrer">
-                        View CV
-                      </a>
-                    ) : (
-                      <span style={{ opacity: 0.6 }}>No CV</span>
-                    )}
-                  </td>
-
-                  {/* Link */}
-                  <td style={styles.tableCell}>
-                    {job.link ? (
-                      <a href={job.link} target="_blank" rel="noreferrer">
-                        View posting
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-
-                  {/* Created */}
-                  <td style={styles.tableCell}>{formattedDate}</td>
-
-                  {/* Actions */}
-                  <td style={styles.actionsCell}>
-                    {editingJobId === job.id ? (
-                      <>
-                        <button
-                          onClick={() => handleUpdate(job.id)}
-                          style={styles.actionButton}
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingJobId(null)}
-                          style={styles.actionButton}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => {
-                            setEditingJobId(job.id);
-                            setEditingStatus(job.status || 'Applied');
-                          }}
-                          style={styles.actionButton}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(job.id)}
-                          style={styles.actionButton}
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
+                    <span style={getStatusStyle(job.status)}>
+                      {job.status}
+                    </span>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+
+          {selectedJob && (
+            <div
+              style={styles.modalBackdrop}
+              onClick={() => setSelectedJob(null)}
+            >
+              <div
+                style={styles.modalCard}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={styles.modalHeaderRow}>
+                  <div>
+                    <div style={styles.modalTitle}>
+                      {selectedJob.positionTitle || 'Job'}
+                    </div>
+                    <div style={styles.modalSubtitle}>
+                      {selectedJob.companyName || '—'}
+                    </div>
+                  </div>
+                  <button
+                    style={styles.modalCloseIcon}
+                    onClick={() => setSelectedJob(null)}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div style={styles.modalMetaRow}>
+                  <span style={getStatusStyle(selectedJob.status || 'Applied')}>
+                    {selectedJob.status || 'Applied'}
+                  </span>
+                  <span style={styles.modalDate}>
+                    {formatDate(selectedJob.createdAt)}
+                  </span>
+                </div>
+
+                <div style={styles.modalSection}>
+                  <div style={styles.modalSectionTitle}>Job link</div>
+                  <div style={styles.modalSectionBody}>
+                    {selectedJob.link ? (
+                      <a
+                        href={selectedJob.link}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open job posting
+                      </a>
+                    ) : (
+                      'No link'
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.modalSection}>
+                  <div style={styles.modalSectionTitle}>CV</div>
+                  <div style={styles.modalSectionBody}>
+                    {selectedJob.cvUrl ? (
+                      <a
+                        href={selectedJob.cvUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View uploaded CV
+                      </a>
+                    ) : (
+                      'No CV uploaded'
+                    )}
+                  </div>
+                </div>
+
+                {/* AI fields */}
+                <div style={styles.modalSection}>
+                  <div style={styles.modalSectionTitle}>AI Insights</div>
+                  <div style={styles.modalDescriptionBox}>
+                    {renderAiField('AI Level', selectedJob.aiLevel)}
+                    {renderAiField('AI Tags', renderAiTags(selectedJob.aiTags))}
+                    {renderAiField('Job Type', selectedJob.aiJobType)}
+                    {renderAiField('Role Summary', selectedJob.aiSummaryRole)}
+                    {renderAiField('Tech Summary', selectedJob.aiSummaryTech)}
+                  </div>
+                </div>
+
+                <div style={styles.modalSection}>
+                  <div style={styles.modalSectionTitle}>Status</div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      value={modalStatus}
+                      onChange={(e) => setModalStatus(e.target.value)}
+                      style={styles.modalSelect}
+                    >
+                      <option value="Applied">Applied</option>
+                      <option value="Interview">Interview</option>
+                      <option value="Offer">Offer</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                    <button
+                      type="button"
+                      style={styles.modalSaveButton}
+                      onClick={handleSaveStatus}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+
+                <div style={styles.modalFooter}>
+                  <button
+                    type="button"
+                    style={styles.modalDeleteButton}
+                    onClick={async () => {
+                      await handleDelete(selectedJob.id);
+                      setSelectedJob(null);
+                    }}
+                  >
+                    Delete job
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -404,103 +447,231 @@ function Dashboard({ onLogout }) {
 
 const styles = {
   container: {
-    padding: '2rem',
-    fontFamily: 'sans-serif',
-    maxWidth: '800px',
+    minHeight: '100vh',
+    padding: '2.5rem 1.5rem 3rem',
+    fontFamily:
+      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    maxWidth: '960px',
     margin: '0 auto',
+    background:
+      'radial-gradient(circle at top left, #f3e8ff 0, #faf5ff 35%, #ffffff 70%)',
+    position: 'relative',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '1rem',
+    marginBottom: '1.5rem',
   },
   logoutButton: {
-    padding: '0.5rem 1rem',
-    borderRadius: '4px',
-    border: '1px solid #ccc',
-    backgroundColor: '#f5f5f5',
+    padding: '0.5rem 1.1rem',
+    borderRadius: '999px',
+    border: '1px solid #e5defc',
+    backgroundColor: '#f5f3ff',
     cursor: 'pointer',
-    fontWeight: '500',
+    fontWeight: 500,
+    fontSize: '0.85rem',
+    color: '#4c1d95',
+    boxShadow: '0 0 0 1px rgba(124, 58, 237, 0.04)',
   },
+
   form: {
     marginTop: '1.5rem',
     marginBottom: '2rem',
-    padding: '1.5rem',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    backgroundColor: '#fff',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+    padding: '1.75rem 1.5rem',
+    borderRadius: '16px',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 18px 45px rgba(15, 23, 42, 0.08)',
+    border: '1px solid rgba(139, 92, 246, 0.12)',
   },
   formGroup: {
     marginBottom: '1rem',
   },
   label: {
     display: 'block',
-    marginBottom: '0.5rem',
-    fontWeight: '500',
+    marginBottom: '0.45rem',
+    fontWeight: 500,
+    fontSize: '0.85rem',
+    color: '#4b3b81',
   },
   input: {
     width: '100%',
-    padding: '0.5rem',
-    borderRadius: '4px',
-    border: '1px solid #ccc',
+    padding: '0.55rem 0.7rem',
+    borderRadius: '10px',
+    border: '1px solid #e2e0f5',
     boxSizing: 'border-box',
+    fontSize: '0.9rem',
+    outline: 'none',
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+    backgroundColor: '#fdfbff',
   },
   button: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#646cff',
-    color: '#fff',
+    marginTop: '0.5rem',
+    padding: '0.7rem 1.6rem',
+    background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+    color: '#ffffff',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '999px',
     cursor: 'pointer',
-    fontWeight: '500',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    boxShadow: '0 12px 30px rgba(124, 58, 237, 0.35)',
   },
   error: {
-    padding: '0.75rem',
+    padding: '0.75rem 1rem',
     marginBottom: '1rem',
-    backgroundColor: '#fee',
-    color: '#c33',
-    borderRadius: '4px',
-    border: '1px solid #fcc',
+    backgroundColor: '#fef2f2',
+    color: '#b91c1c',
+    borderRadius: '10px',
+    border: '1px solid #fecaca',
+    fontSize: '0.85rem',
   },
   jobsTitle: {
-    marginBottom: '0.75rem',
+    marginBottom: '0.35rem',
   },
+
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    marginTop: '0.5rem',
+    marginTop: '0.75rem',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)',
+    backgroundColor: '#ffffff',
   },
   tableHeaderCell: {
     textAlign: 'left',
-    padding: '0.5rem',
-    borderBottom: '1px solid #ddd',
-    fontSize: '0.9rem',
+    padding: '0.7rem 0.9rem',
+    borderBottom: '1px solid #e5defc',
+    fontSize: '0.8rem',
     fontWeight: 600,
-    backgroundColor: '#f7f7f7',
+    background: 'linear-gradient(to right, #f5f3ff, #ede9fe)',
+    color: '#5b21b6',
+  },
+  tableRow: {
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease',
   },
   tableCell: {
-    padding: '0.5rem',
-    borderBottom: '1px solid #eee',
-    fontSize: '0.9rem',
+    padding: '0.7rem 0.9rem',
+    borderBottom: '1px solid #f3f0ff',
+    fontSize: '0.88rem',
     verticalAlign: 'top',
   },
-  actionsCell: {
-    padding: '0.5rem',
-    borderBottom: '1px solid #eee',
-    fontSize: '0.9rem',
-    verticalAlign: 'top',
-    whiteSpace: 'nowrap',
+
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
-  actionButton: {
-    marginRight: '0.4rem',
-    padding: '0.25rem 0.6rem',
-    fontSize: '0.8rem',
-    borderRadius: '4px',
-    border: '1px solid #ccc',
-    backgroundColor: '#f5f5f5',
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: '18px',
+    padding: '1.7rem 1.6rem',
+    width: '90%',
+    maxWidth: '560px',
+    boxShadow: '0 24px 60px rgba(15, 23, 42, 0.45)',
+    maxHeight: '80vh',
+    overflowY: 'auto',
+  },
+  modalHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '0.9rem',
+  },
+  modalTitle: {
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    marginBottom: '0.25rem',
+    color: '#1e1b4b',
+  },
+  modalSubtitle: {
+    fontSize: '0.9rem',
+    color: '#6b5ca5',
+  },
+  modalCloseIcon: {
+    border: 'none',
+    background: 'transparent',
+    fontSize: '1.4rem',
     cursor: 'pointer',
+    lineHeight: 1,
+    color: '#4c1d95',
+  },
+  modalMetaRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+    gap: '0.5rem',
+  },
+  modalDate: {
+    fontSize: '0.8rem',
+    color: '#6b7280',
+  },
+  modalSection: {
+    marginBottom: '1rem',
+  },
+  modalSectionTitle: {
+    fontSize: '0.82rem',
+    fontWeight: 600,
+    marginBottom: '0.25rem',
+    color: '#4c1d95',
+  },
+  modalSectionBody: {
+    fontSize: '0.9rem',
+    color: '#111827',
+    wordBreak: 'break-word',
+  },
+  modalDescriptionBox: {
+    fontSize: '0.85rem',
+    color: '#111827',
+    backgroundColor: '#f5f3ff',
+    borderRadius: '12px',
+    padding: '0.75rem 0.8rem',
+    maxHeight: '220px',
+    overflowY: 'auto',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    lineHeight: 1.4,
+    border: '1px solid #e5defc',
+  },
+  modalSelect: {
+    padding: '0.35rem 0.6rem',
+    borderRadius: '999px',
+    border: '1px solid #e2e0f5',
+    fontSize: '0.85rem',
+    backgroundColor: '#fdfbff',
+  },
+  modalSaveButton: {
+    padding: '0.4rem 0.9rem',
+    borderRadius: '999px',
+    border: 'none',
+    background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+    color: '#ffffff',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    boxShadow: '0 10px 25px rgba(124, 58, 237, 0.35)',
+  },
+  modalFooter: {
+    marginTop: '0.5rem',
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  modalDeleteButton: {
+    padding: '0.45rem 0.9rem',
+    borderRadius: '999px',
+    border: 'none',
+    backgroundColor: '#fee2e2',
+    color: '#b91c1c',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    fontWeight: 500,
   },
 };
 
