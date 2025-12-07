@@ -4,6 +4,7 @@ const { scrapeJobDescription } = require('./scraperService');
 const { analyzeJobDescription } = require('./aiService');
 
 async function getJobs(userEmail) {
+  // מושך את כל שדות המשרה, כולל הנתונים המנותחים מה-AI
   return prisma.job.findMany({
     where: { userEmail },
     orderBy: { createdAt: 'desc' },
@@ -11,7 +12,8 @@ async function getJobs(userEmail) {
 }
 
 async function createJob(userEmail, jobData) {
-  const { companyName, positionTitle, link, status } = jobData;
+  // נשתמש ב-let כדי שנוכל לעדכן את positionTitle בהמשך
+  let { companyName, positionTitle, link, status } = jobData; 
 
   // --- שלב 1: Scraping ---
   let description = null;
@@ -25,14 +27,21 @@ async function createJob(userEmail, jobData) {
     const analysisResult = await analyzeJobDescription(description);
   
     if (analysisResult) {
-      // 👇 נשנה את שמות השדות כדי להתאים למודל Prisma החדש
-      aiData.description = analysisResult.description; 
+      // 🥇 מילוי אוטומטי חובה: מעדכנים את positionTitle בערך שחולץ מה-AI.
+      // כך, גם אם המשתמש לא הזין כותרת, או הזין כותרת לא מדויקת, ה-AI מתקן אותה.
+      if (analysisResult.positionTitle) {
+          positionTitle = analysisResult.positionTitle;
+      }
+
+      // 👇 מיפוי כל שדות ה-AI (החדשים והקיימים)
+      aiData.description = description; // שמירת הטקסט שנסרק ב-DB
       aiData.aiLevel = analysisResult.aiLevel;
       aiData.aiTags = analysisResult.aiTags; 
-      aiData.aiSummaryRole = analysisResult.aiSummaryRole; // 👈 חדש
-      aiData.aiSummaryTech = analysisResult.aiSummaryTech; // 👈 חדש
-      aiData.aiJobType = analysisResult.aiJobType;     // 👈 חדש
+      aiData.aiSummaryRole = analysisResult.aiSummaryRole; 
+      aiData.aiSummaryTech = analysisResult.aiSummaryTech; 
+      aiData.aiJobType = analysisResult.aiJobType;     
     } else {
+      // אם ניתוח ה-AI נכשל, לפחות נשמור את התיאור שנסרק
       aiData.description = description;
     }
   }
@@ -42,7 +51,8 @@ async function createJob(userEmail, jobData) {
     data: {
       userEmail,
       companyName,
-      positionTitle,
+      // משתמשים ב-positionTitle המעודכן. אם הוא עדיין ריק (כי אין קישור/ה-AI נכשל), נשתמש בברירת מחדל
+      positionTitle: positionTitle || 'Untitled Job', 
       link: link || null,
       status: status || 'Applied',
       // שילוב נתוני ה-AI/Scraping
@@ -55,15 +65,11 @@ async function deleteJob(userEmail, jobId) {
   const result = await prisma.job.deleteMany({
     where: { id: jobId, userEmail },
   });
-
-  // נחזיר את מספר הרשומות שנמחקו למקרה שה־controller רוצה לדעת
   return result.count;
 }
 
 /**
  * מעדכן משרה באופן חלקי ומחזיר את האובייקט המעודכן.
- * אם לא נמצאה משרה – מחזיר null.
- * אם לא נשלחו שדות לעדכון – מחזיר את המשרה כפי שהיא.
  */
 async function updateJob(userEmail, jobId, jobData) {
   const { companyName, positionTitle, link, status, cvUrl } = jobData;
@@ -75,7 +81,6 @@ async function updateJob(userEmail, jobId, jobData) {
   if (status !== undefined) data.status = status;
   if (cvUrl !== undefined) data.cvUrl = cvUrl;
 
-  // אם אין שום דבר לעדכן – נחזיר את המשרה הקיימת (או null אם לא קיימת)
   if (Object.keys(data).length === 0) {
     return prisma.job.findFirst({
       where: { id: jobId, userEmail },
@@ -88,11 +93,9 @@ async function updateJob(userEmail, jobId, jobData) {
   });
 
   if (result.count === 0) {
-    // לא עודכנו רשומות – כנראה המשרה לא שייכת למשתמש / לא קיימת
     return null;
   }
 
-  // מחזירים את המשרה המעודכנת
   const updated = await prisma.job.findFirst({
     where: { id: jobId, userEmail },
   });
